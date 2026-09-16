@@ -63,6 +63,7 @@ struct OnboardingView: View {
             Text("onboarding.1.body")
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -75,6 +76,7 @@ struct OnboardingView: View {
             Text("onboarding.2.body")
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -87,6 +89,7 @@ struct OnboardingView: View {
             Text("onboarding.3.body")
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
 
             Toggle(isOn: $appState.updateChecksEnabled) {
                 Text("settings.updates")
