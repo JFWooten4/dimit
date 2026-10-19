@@ -1,10 +1,11 @@
 import Foundation
 
-/// CLAUDE.md §3.8: "Manual (default), Sunset->Sunrise, Fixed times."
+/// Automatic preset schedules plus an optional, continuous daily bell curve.
 enum ScheduleMode: String, Codable, CaseIterable {
     case manual
     case sunsetToSunrise
     case fixedTimes
+    case bellCurve
 }
 
 /// A wall-clock time, timezone-agnostic — interpreted against whatever
@@ -49,6 +50,9 @@ struct ScheduleConfig: Codable, Equatable {
     var fixedEveningStart: TimeOfDay
     /// CLAUDE.md §3.8: "linear ramp over a user-set duration (default 20 min)."
     var rampMinutes: Int
+    var peakTime: TimeOfDay = TimeOfDay(hour: 13, minute: 0)
+    var lowBrightness: Double = 0.4
+    var peakBrightness: Double = 1.0
 
     static let defaults = ScheduleConfig(
         mode: .manual,
@@ -94,6 +98,9 @@ struct ScheduleConfig: Codable, Equatable {
         fixedDayStart = try container.decodeIfPresent(TimeOfDay.self, forKey: .fixedDayStart) ?? fallback.fixedDayStart
         fixedEveningStart = try container.decodeIfPresent(TimeOfDay.self, forKey: .fixedEveningStart) ?? fallback.fixedEveningStart
         rampMinutes = try container.decodeIfPresent(Int.self, forKey: .rampMinutes) ?? fallback.rampMinutes
+        peakTime = try container.decodeIfPresent(TimeOfDay.self, forKey: .peakTime) ?? fallback.peakTime
+        lowBrightness = try container.decodeIfPresent(Double.self, forKey: .lowBrightness) ?? fallback.lowBrightness
+        peakBrightness = try container.decodeIfPresent(Double.self, forKey: .peakBrightness) ?? fallback.peakBrightness
     }
 }
 
@@ -103,6 +110,8 @@ struct SchedulePhase: Equatable {
     let preset: PresetID
     let start: Date
     let rampMinutes: Int
+    var brightnessOverride: Double? = nil
+    var smoothRamp: Bool = false
 }
 
 /// A pure function over time, plus the small amount of state
@@ -119,6 +128,23 @@ enum ScheduleEngine {
         switch mode {
         case .manual:
             return []
+
+        case .bellCurve:
+            guard let times = bellTimes(on: day, config: config, calendar: calendar) else { return [] }
+            let low = config.lowBrightness.clamped(to: Config.minBrightness...Config.maxBrightness)
+            let peak = config.peakBrightness.clamped(to: low...Config.maxBrightness)
+            // Each half of the curve is a cosine fade, with zero slope at
+            // wake-up, peak and bedtime. Hold the low value overnight.
+            return [
+                SchedulePhase(preset: .day, start: times.wake,
+                              rampMinutes: Int(times.peak.timeIntervalSince(times.wake) / 60),
+                              brightnessOverride: peak, smoothRamp: true),
+                SchedulePhase(preset: .night, start: times.peak,
+                              rampMinutes: Int(times.bed.timeIntervalSince(times.peak) / 60),
+                              brightnessOverride: low, smoothRamp: true),
+                SchedulePhase(preset: .night, start: times.bed, rampMinutes: 0,
+                              brightnessOverride: low, smoothRamp: true),
+            ]
 
         case .sunsetToSunrise:
             guard let location = config.location,
@@ -144,6 +170,23 @@ enum ScheduleEngine {
                 SchedulePhase(preset: .night, start: clockTime(config.bedtime, on: day, calendar: calendar), rampMinutes: config.rampMinutes),
             ])
         }
+    }
+
+    /// Resolve clock times relative to wake-up, including schedules whose
+    /// bedtime (or peak) falls after midnight. Invalid ordering has no target.
+    static func bellTimes(on day: Date, config: ScheduleConfig, calendar: Calendar) -> (wake: Date, peak: Date, bed: Date)? {
+        guard config.bedtime != config.fixedDayStart else { return nil }
+        let wake = clockTime(config.fixedDayStart, on: day, calendar: calendar)
+        func followingWake(_ time: TimeOfDay) -> Date {
+            let sameDay = clockTime(time, on: day, calendar: calendar)
+            guard sameDay <= wake else { return sameDay }
+            let nextDay = calendar.date(byAdding: .day, value: 1, to: day) ?? day
+            return clockTime(time, on: nextDay, calendar: calendar)
+        }
+        let peak = followingWake(config.peakTime)
+        let bed = followingWake(config.bedtime)
+        guard wake < peak, peak < bed else { return nil }
+        return (wake, peak, bed)
     }
 
     /// Enforces `day.start < evening.start < night.start`, nudging a
@@ -221,7 +264,7 @@ enum ScheduleEngine {
     /// user who customized EVENING must get their own EVENING from the
     /// schedule, not the factory one.
     ///
-    /// The `.day` phase is the schedule's own "off": once its ramp
+    /// In preset schedules, the `.day` phase is the schedule's own "off": once its ramp
     /// completes, `isOn` is `false` and the values are neutral —
     /// `PresetID.day`'s actual values (4000K/100%, a mild warm daytime
     /// preset, not neutral 6500K) stay reachable only as a manual preset
@@ -233,14 +276,15 @@ enum ScheduleEngine {
     /// that looked like "off" again, since even its own "back to DAY"
     /// phase left `isOn` untouched at a permanent, unexplained 4000K tint.
     /// A schedule literally named "Sunset→Sunrise" that can never actually
-    /// stop at sunrise defeats the one thing its name promises.
+    /// stop at sunrise defeats the one thing its name promises. Bell-curve
+    /// phases override brightness and keep dimming enabled even at the peak.
     static func target(at now: Date, phases: [SchedulePhase], values: (PresetID) -> PresetValues) -> Resolution? {
         let sorted = phases.sorted { $0.start < $1.start }
         guard let activeIndex = sorted.lastIndex(where: { $0.start <= now }) else { return nil }
 
         let active = sorted[activeIndex]
-        let isOffPhase = active.preset == .day
-        let targetValues = phaseValues(active.preset, values: values)
+        let isOffPhase = active.preset == .day && active.brightnessOverride == nil
+        let targetValues = phaseValues(active, values: values)
 
         let rampEnd = active.start.addingTimeInterval(Double(active.rampMinutes) * 60)
         if active.rampMinutes <= 0 || now >= rampEnd {
@@ -248,7 +292,7 @@ enum ScheduleEngine {
                 isOn: !isOffPhase,
                 warmthK: targetValues.warmthK,
                 brightness: targetValues.brightness,
-                settledPreset: isOffPhase ? nil : active.preset
+                settledPreset: isOffPhase || active.brightnessOverride != nil ? nil : active.preset
             )
         }
 
@@ -261,10 +305,11 @@ enum ScheduleEngine {
         // itself treats "nothing configured yet" as off rather than
         // guessing a preset.
         let previousValues: PresetValues = activeIndex > 0
-            ? phaseValues(sorted[activeIndex - 1].preset, values: values)
+            ? phaseValues(sorted[activeIndex - 1], values: values)
             : PresetValues(warmthK: Config.maxWarmthK, brightness: Config.maxBrightness)
         let duration = rampEnd.timeIntervalSince(active.start)
-        let fraction = duration > 0 ? (now.timeIntervalSince(active.start) / duration).clamped(to: 0...1) : 1.0
+        let progress = duration > 0 ? (now.timeIntervalSince(active.start) / duration).clamped(to: 0...1) : 1.0
+        let fraction = active.smoothRamp ? (1 - cos(.pi * progress)) / 2 : progress
 
         return Resolution(
             isOn: true,
@@ -281,8 +326,12 @@ enum ScheduleEngine {
     /// lookups apply this override, so they can't drift apart the way an
     /// earlier draft of this function did (the active phase correctly
     /// resolved to neutral, the previous-phase lookup didn't).
-    private static func phaseValues(_ preset: PresetID, values: (PresetID) -> PresetValues) -> PresetValues {
-        preset == .day ? PresetValues(warmthK: Config.maxWarmthK, brightness: Config.maxBrightness) : values(preset)
+    private static func phaseValues(_ phase: SchedulePhase, values: (PresetID) -> PresetValues) -> PresetValues {
+        var result = phase.preset == .day
+            ? PresetValues(warmthK: Config.maxWarmthK, brightness: Config.maxBrightness)
+            : values(phase.preset)
+        if let brightness = phase.brightnessOverride { result.brightness = brightness }
+        return result
     }
 
     private static func clockTime(_ time: TimeOfDay, on day: Date, calendar: Calendar) -> Date {

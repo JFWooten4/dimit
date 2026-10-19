@@ -28,11 +28,11 @@ struct ScheduleSettingsTab: View {
                     Text("schedule.manual").tag(ScheduleMode.manual)
                     Text("schedule.sun").tag(ScheduleMode.sunsetToSunrise)
                     Text("schedule.fixed").tag(ScheduleMode.fixedTimes)
+                    Text("schedule.bell").tag(ScheduleMode.bellCurve)
                 } label: {
                     Text("schedule.mode_title")
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
+                .pickerStyle(.menu)
             }
 
             switch appState.scheduleConfig.mode {
@@ -60,6 +60,8 @@ struct ScheduleSettingsTab: View {
                 timeSection(title: "schedule.fixed_evening_start", binding: $appState.scheduleConfig.fixedEveningStart)
                 timeSection(title: "schedule.bedtime", binding: $appState.scheduleConfig.bedtime)
                 rampSection
+            case .bellCurve:
+                bellSection
             }
         }
         .formStyle(.grouped)
@@ -157,6 +159,84 @@ struct ScheduleSettingsTab: View {
     }
 
     // MARK: - Shared rows
+
+    private var bellSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 6) {
+                bellPreview
+                    .frame(height: 54)
+                    .accessibilityHidden(true)
+                Text("schedule.bell_help")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            DatePicker(selection: timeOfDayAsDate($appState.scheduleConfig.fixedDayStart), displayedComponents: .hourAndMinute) {
+                Text("schedule.wake")
+            }
+            DatePicker(selection: timeOfDayAsDate($appState.scheduleConfig.peakTime), displayedComponents: .hourAndMinute) {
+                Text("schedule.peak")
+            }
+            DatePicker(selection: timeOfDayAsDate($appState.scheduleConfig.bedtime), displayedComponents: .hourAndMinute) {
+                Text("schedule.bedtime")
+            }
+            brightnessRow(title: "schedule.low_brightness", binding: Binding(
+                get: { appState.scheduleConfig.lowBrightness },
+                set: {
+                    appState.scheduleConfig.lowBrightness = $0
+                    appState.scheduleConfig.peakBrightness = max($0, appState.scheduleConfig.peakBrightness)
+                }
+            ))
+            brightnessRow(title: "schedule.peak_brightness", binding: Binding(
+                get: { appState.scheduleConfig.peakBrightness },
+                set: {
+                    appState.scheduleConfig.peakBrightness = $0
+                    appState.scheduleConfig.lowBrightness = min($0, appState.scheduleConfig.lowBrightness)
+                }
+            ))
+            if ScheduleEngine.bellTimes(on: Date(), config: appState.scheduleConfig, calendar: .current) == nil {
+                Text("schedule.bell_invalid")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func brightnessRow(title: LocalizedStringResource, binding: Binding<Double>) -> some View {
+        HStack {
+            Text(title)
+                .frame(width: 175, alignment: .leading)
+            Slider(value: binding, in: Config.minBrightness...Config.maxBrightness, step: 0.01)
+                .accessibilityLabel(Text(title))
+            Text(ValueFormatting.brightness(binding.wrappedValue))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(width: 42, alignment: .trailing)
+        }
+    }
+
+    private var bellPreview: some View {
+        let config = appState.scheduleConfig
+        let calendar = Calendar.current
+        let times = ScheduleEngine.bellTimes(on: Date(), config: config, calendar: calendar)
+        return GeometryReader { geometry in
+            Path { path in
+                guard let times,
+                      let end = calendar.date(byAdding: .day, value: 1, to: times.wake) else { return }
+                for index in 0...144 {
+                    let x = Double(index) / 144
+                    let date = times.wake.addingTimeInterval(end.timeIntervalSince(times.wake) * x)
+                    let phases = ScheduleEngine.phases(coveringDayOf: date, mode: .bellCurve, config: config, calendar: calendar)
+                    guard let target = ScheduleEngine.target(at: date, phases: phases, values: appState.values(for:)) else { continue }
+                    let point = CGPoint(x: x * geometry.size.width,
+                                        y: (1 - target.brightness) * (geometry.size.height - 4) + 2)
+                    if index == 0 { path.move(to: point) } else { path.addLine(to: point) }
+                }
+            }
+            .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+        }
+    }
 
     private func timeSection(title: LocalizedStringResource, binding: Binding<TimeOfDay>) -> some View {
         Section {

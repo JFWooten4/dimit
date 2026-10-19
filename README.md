@@ -19,6 +19,8 @@ licence keys, activation, or telemetry.
   measure flicker. Third-party DDC/CI control is experimental and off by default.
 - **Sunset/sunrise or fixed-time schedules**, calculated locally from a bundled
   city list or an optional device location, plus presets and global shortcuts.
+- **Bell-curve schedule** with wake-up, peak and bedtime controls: ease from a
+  chosen low brightness to a daytime peak, then gradually dim again for the night.
 - **Restore Colours** is available from the menu. OFF, quit, signal handlers,
   and launch restore the gamma tables; restoration on relaunch also handles a
   force-killed process.

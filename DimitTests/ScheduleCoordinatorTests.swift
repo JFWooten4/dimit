@@ -289,4 +289,34 @@ final class ScheduleCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(state.warmthK, 5000, "manual mode must leave whatever the user set alone")
     }
+
+    func test_bellCurve_keepsDimmingEnabled_andResumesManualOverrideAtPeak() {
+        let state = freshState()
+        var config = ScheduleConfig.defaults
+        config.mode = .bellCurve
+        config.fixedDayStart = TimeOfDay(hour: 6, minute: 0)
+        config.peakTime = TimeOfDay(hour: 12, minute: 0)
+        config.bedtime = TimeOfDay(hour: 22, minute: 0)
+        config.lowBrightness = 0.2
+        config.peakBrightness = 0.8
+        state.scheduleConfig = config
+        let clock = TestClock(date(2026, 9, 8, 6))
+        let coordinator = ScheduleCoordinator(appState: state, calendar: { self.calendar }, now: clock.now)
+        defer { coordinator.stop() }
+        XCTAssertTrue(state.isOn)
+        XCTAssertEqual(state.brightness, 0.2, accuracy: 0.000001)
+        clock.current = date(2026, 9, 8, 9)
+        coordinator.evaluateNow()
+        XCTAssertEqual(state.brightness, 0.5, accuracy: 0.000001)
+        state.brightness = 0.3
+        clock.current = date(2026, 9, 8, 10)
+        coordinator.evaluateNow()
+        XCTAssertEqual(state.brightness, 0.3, accuracy: 0.000001)
+        clock.current = date(2026, 9, 8, 12)
+        coordinator.evaluateNow()
+        XCTAssertTrue(state.isOn)
+        XCTAssertEqual(state.brightness, 0.8, accuracy: 0.000001)
+        XCTAssertNil(coordinator.pausedAtPhaseStart)
+    }
+
 }

@@ -840,6 +840,72 @@
         }
       }
     },
+    "schedule.bell": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bell curve"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Колокол"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Qo‘ng‘iroqsimon"
+          }
+        }
+      }
+    },
+    "schedule.bell_help": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start dim at wake-up, brighten smoothly to your peak, then fade back down by bedtime. Night warmth follows your NIGHT preset."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Тусклый свет при пробуждении плавно усиливается до пика и снижается ко сну. Ночная теплота — из пресета NIGHT."
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Uyg‘onishda xira yorug‘lik asta-sekin eng yuqori darajaga ko‘tarilib, uyqu vaqtigacha pasayadi. Tungi iliqlik NIGHT sozlamasidan olinadi."
+          }
+        }
+      }
+    },
+    "schedule.bell_invalid": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peak time must fall between wake-up and bedtime. Bedtime may be after midnight."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Пик должен быть между пробуждением и сном. Время сна может быть после полуночи."
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Eng yorqin vaqt uyg‘onish va uyqu orasida bo‘lishi kerak. Uyqu vaqti yarim tundan keyin bo‘lishi mumkin."
+          }
+        }
+      }
+    },
     "schedule.city": {
       "localizations": {
         "en": {
@@ -1786,6 +1852,28 @@
         }
       }
     },
+    "schedule.low_brightness": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wake / night brightness"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Яркость утром и ночью"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Tong va tun yorqinligi"
+          }
+        }
+      }
+    },
     "schedule.manual": {
       "localizations": {
         "en": {
@@ -1848,6 +1936,50 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Rejim"
+          }
+        }
+      }
+    },
+    "schedule.peak": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peak time"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Время пика"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Eng yorqin vaqt"
+          }
+        }
+      }
+    },
+    "schedule.peak_brightness": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peak brightness"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Пиковая яркость"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Eng yuqori yorqinlik"
           }
         }
       }
@@ -1980,6 +2112,28 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Joylashuvimdan foydalanish"
+          }
+        }
+      }
+    },
+    "schedule.wake": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wake-up"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Пробуждение"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Uyg‘onish"
           }
         }
       }

@@ -297,4 +297,125 @@ final class ScheduleEngineTests: XCTestCase {
         XCTAssertFalse(target.isOn)
         XCTAssertEqual(target.warmthK, Config.maxWarmthK)
     }
+
+    private func bellConfig() -> ScheduleConfig {
+        var config = ScheduleConfig.defaults
+        config.mode = .bellCurve
+        config.fixedDayStart = TimeOfDay(hour: 6, minute: 0)
+        config.peakTime = TimeOfDay(hour: 12, minute: 0)
+        config.bedtime = TimeOfDay(hour: 22, minute: 0)
+        config.lowBrightness = 0.2
+        config.peakBrightness = 0.8
+        return config
+    }
+
+    private func bellTarget(_ now: Date, config: ScheduleConfig) throws -> ScheduleEngine.Resolution {
+        let phases = ScheduleEngine.phases(coveringDayOf: now, mode: .bellCurve, config: config, calendar: calendar)
+        return try XCTUnwrap(ScheduleEngine.target(at: now, phases: phases, values: values))
+    }
+
+    func test_bellCurve_startsDim_peaksAtChosenBrightness_andHoldsDimOvernight() throws {
+        let config = bellConfig()
+        for hour in [0, 5, 6, 22, 23] {
+            let target = try bellTarget(date(2026, 9, 8, hour), config: config)
+            XCTAssertEqual(target.brightness, 0.2, accuracy: 0.000001)
+            XCTAssertTrue(target.isOn, "dimming must stay active, including at the daytime peak")
+            XCTAssertNil(target.settledPreset, "curve values must not claim to be a preset")
+        }
+        let peak = try bellTarget(date(2026, 9, 8, 12), config: config)
+        XCTAssertEqual(peak.brightness, 0.8, accuracy: 0.000001)
+        XCTAssertEqual(peak.warmthK, Config.maxWarmthK)
+        XCTAssertTrue(peak.isOn)
+        XCTAssertEqual(try bellTarget(date(2026, 9, 8, 9), config: config).brightness, 0.5, accuracy: 0.000001)
+        XCTAssertEqual(try bellTarget(date(2026, 9, 8, 17), config: config).brightness, 0.5, accuracy: 0.000001)
+    }
+
+    func test_bellCurve_easesAtBoundaries_andNeverJumpsOrExceedsItsRange() throws {
+        let config = bellConfig()
+        var last = try bellTarget(date(2026, 9, 8), config: config).brightness
+        for minute in 1...1440 {
+            let now = date(2026, 9, 8).addingTimeInterval(Double(minute) * 60)
+            let current = try bellTarget(now, config: config).brightness
+            XCTAssertTrue((0.2...0.8).contains(current))
+            XCTAssertLessThan(abs(current - last), 0.003)
+            if minute > 360 && minute <= 720 { XCTAssertGreaterThanOrEqual(current, last) }
+            if minute > 720 && minute <= 1320 { XCTAssertLessThanOrEqual(current, last) }
+            last = current
+        }
+        let firstMinute = try bellTarget(date(2026, 9, 8, 6, 1), config: config).brightness
+        XCTAssertLessThan(firstMinute - 0.2, 0.00002, "ease in gently instead of a linear start")
+    }
+
+    func test_bellCurve_supportsBedtimeAndPeakAfterMidnight() throws {
+        var config = bellConfig()
+        config.fixedDayStart = TimeOfDay(hour: 18, minute: 0)
+        config.peakTime = TimeOfDay(hour: 0, minute: 0)
+        config.bedtime = TimeOfDay(hour: 6, minute: 0)
+        XCTAssertEqual(try bellTarget(date(2026, 9, 9, 0), config: config).brightness, 0.8, accuracy: 0.000001)
+        XCTAssertEqual(try bellTarget(date(2026, 9, 9, 3), config: config).brightness, 0.5, accuracy: 0.000001)
+        XCTAssertEqual(try bellTarget(date(2026, 9, 9, 12), config: config).brightness, 0.2, accuracy: 0.000001)
+    }
+
+    func test_bellCurve_invalidPeakHasNoTarget_andBrightnessIsClamped() throws {
+        var config = bellConfig()
+        config.peakTime = config.bedtime
+        XCTAssertTrue(ScheduleEngine.phases(for: date(2026, 9, 8), mode: .bellCurve, config: config, calendar: calendar).isEmpty)
+        config.bedtime = config.fixedDayStart
+        XCTAssertNil(ScheduleEngine.bellTimes(on: date(2026, 9, 8), config: config, calendar: calendar))
+        config.bedtime = TimeOfDay(hour: 22, minute: 0)
+        config.peakTime = TimeOfDay(hour: 12, minute: 0)
+        config.lowBrightness = -1
+        config.peakBrightness = 2
+        XCTAssertEqual(try bellTarget(date(2026, 9, 8, 6), config: config).brightness, Config.minBrightness)
+        XCTAssertEqual(try bellTarget(date(2026, 9, 8, 12), config: config).brightness, Config.maxBrightness)
+    }
+
+    func test_bellCurve_usesCustomizedNightWarmth() throws {
+        let config = bellConfig()
+        let now = date(2026, 9, 8, 9)
+        let phases = ScheduleEngine.phases(coveringDayOf: now, mode: .bellCurve, config: config, calendar: calendar)
+        let target = try XCTUnwrap(ScheduleEngine.target(at: now, phases: phases) { _ in
+            PresetValues(warmthK: 1500, brightness: 0.7)
+        })
+        XCTAssertEqual(target.warmthK, 4000, accuracy: 0.000001)
+        XCTAssertEqual(target.brightness, 0.5, accuracy: 0.000001)
+    }
+
+    func test_bellCurve_configRoundTrips_andOldSchedulesKeepTheirValues() throws {
+        let original = bellConfig()
+        XCTAssertEqual(try JSONDecoder().decode(ScheduleConfig.self, from: JSONEncoder().encode(original)), original)
+        let oldJSON = Data(#"{"mode":"fixedTimes","rampMinutes":45,"fixedDayStart":{"hour":8,"minute":15}}"#.utf8)
+        let old = try JSONDecoder().decode(ScheduleConfig.self, from: oldJSON)
+        XCTAssertEqual(old.mode, .fixedTimes)
+        XCTAssertEqual(old.rampMinutes, 45)
+        XCTAssertEqual(old.fixedDayStart, TimeOfDay(hour: 8, minute: 15))
+        XCTAssertEqual(old.peakTime, ScheduleConfig.defaults.peakTime)
+        XCTAssertEqual(old.lowBrightness, ScheduleConfig.defaults.lowBrightness)
+        XCTAssertEqual(old.peakBrightness, ScheduleConfig.defaults.peakBrightness)
+    }
+
+
+    func test_bellCurve_overnightSchedule_remainsContinuousAcrossDaylightSavingChanges() throws {
+        var localCalendar = Calendar(identifier: .gregorian)
+        localCalendar.timeZone = TimeZone(identifier: "America/New_York")!
+        var config = bellConfig()
+        config.fixedDayStart = TimeOfDay(hour: 18, minute: 0)
+        config.peakTime = TimeOfDay(hour: 0, minute: 0)
+        config.bedtime = TimeOfDay(hour: 6, minute: 0)
+        for (month, day) in [(3, 8), (11, 1)] {
+            let midnight = try XCTUnwrap(localCalendar.date(from: DateComponents(year: 2026, month: month, day: day)))
+            var previous = 0.8
+            let bed = try XCTUnwrap(localCalendar.date(bySettingHour: 6, minute: 0, second: 0, of: midnight))
+            for offset in stride(from: 0.0, through: bed.timeIntervalSince(midnight), by: 60) {
+                let now = midnight.addingTimeInterval(offset)
+                let phases = ScheduleEngine.phases(coveringDayOf: now, mode: .bellCurve, config: config, calendar: localCalendar)
+                let target = try XCTUnwrap(ScheduleEngine.target(at: now, phases: phases, values: values))
+                XCTAssertLessThanOrEqual(target.brightness, previous + 0.000001)
+                XCTAssertLessThan(abs(target.brightness - previous), 0.004)
+                previous = target.brightness
+            }
+            XCTAssertEqual(previous, 0.2, accuracy: 0.000001)
+        }
+    }
+
 }
