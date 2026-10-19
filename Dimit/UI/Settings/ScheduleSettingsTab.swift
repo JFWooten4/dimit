@@ -220,21 +220,29 @@ struct ScheduleSettingsTab: View {
         let config = appState.scheduleConfig
         let calendar = Calendar.current
         let times = ScheduleEngine.bellTimes(on: Date(), config: config, calendar: calendar)
+        let samples: [(x: Double, target: ScheduleEngine.Resolution)] = (0...144).compactMap { index in
+            guard let times,
+                  let end = calendar.date(byAdding: .day, value: 1, to: times.wake) else { return nil }
+            let x = Double(index) / 144
+            let date = times.wake.addingTimeInterval(end.timeIntervalSince(times.wake) * x)
+            let phases = ScheduleEngine.phases(coveringDayOf: date, mode: .bellCurve, config: config, calendar: calendar)
+            guard let target = ScheduleEngine.target(at: date, phases: phases, values: appState.values(for:)) else { return nil }
+            return (x, target)
+        }
+        let gradient = Gradient(stops: samples.map { sample in
+            let rgb = WarmthCurve.rgb(kelvin: sample.target.warmthK)
+            return Gradient.Stop(color: Color(red: rgb.r, green: rgb.g, blue: rgb.b), location: sample.x)
+        })
         return GeometryReader { geometry in
             Path { path in
-                guard let times,
-                      let end = calendar.date(byAdding: .day, value: 1, to: times.wake) else { return }
-                for index in 0...144 {
-                    let x = Double(index) / 144
-                    let date = times.wake.addingTimeInterval(end.timeIntervalSince(times.wake) * x)
-                    let phases = ScheduleEngine.phases(coveringDayOf: date, mode: .bellCurve, config: config, calendar: calendar)
-                    guard let target = ScheduleEngine.target(at: date, phases: phases, values: appState.values(for:)) else { continue }
-                    let point = CGPoint(x: x * geometry.size.width,
-                                        y: (1 - target.brightness) * (geometry.size.height - 4) + 2)
+                for (index, sample) in samples.enumerated() {
+                    let point = CGPoint(x: sample.x * geometry.size.width,
+                                        y: (1 - sample.target.brightness) * (geometry.size.height - 4) + 2)
                     if index == 0 { path.move(to: point) } else { path.addLine(to: point) }
                 }
             }
-            .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+            .stroke(LinearGradient(gradient: gradient, startPoint: .leading, endPoint: .trailing),
+                    style: StrokeStyle(lineWidth: 3, lineCap: .round))
         }
     }
 

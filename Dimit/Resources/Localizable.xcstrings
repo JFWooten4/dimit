@@ -867,19 +867,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Start dim at wake-up, brighten smoothly to your peak, then fade back down by bedtime. Night warmth follows your NIGHT preset."
+            "value": "Height shows brightness; color shows warmth. Ease up from wake-up to your peak, then fade by bedtime. Night warmth follows your NIGHT preset."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Тусклый свет при пробуждении плавно усиливается до пика и снижается ко сну. Ночная теплота — из пресета NIGHT."
+            "value": "Высота — яркость, цвет — теплота. Плавный подъём от пробуждения к пику и спад ко сну. Ночная теплота — из пресета NIGHT."
           }
         },
         "uz": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Uyg‘onishda xira yorug‘lik asta-sekin eng yuqori darajaga ko‘tarilib, uyqu vaqtigacha pasayadi. Tungi iliqlik NIGHT sozlamasidan olinadi."
+            "value": "Balandlik — yorqinlik, rang — iliqlik. Uyg‘onishdan eng yuqori darajagacha asta ko‘tarilib, uyqugacha pasayadi. Tungi iliqlik NIGHT sozlamasidan olinadi."
           }
         }
       }
