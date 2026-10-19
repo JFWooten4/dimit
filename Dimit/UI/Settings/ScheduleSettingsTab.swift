@@ -234,15 +234,28 @@ struct ScheduleSettingsTab: View {
             return Gradient.Stop(color: Color(red: rgb.r, green: rgb.g, blue: rgb.b), location: sample.x)
         })
         return GeometryReader { geometry in
-            Path { path in
+            let huePath = Path { path in
                 for (index, sample) in samples.enumerated() {
                     let point = CGPoint(x: sample.x * geometry.size.width,
-                                        y: (1 - sample.target.brightness) * (geometry.size.height - 4) + 2)
+                                        y: (1 - sample.target.warmthK / Config.maxWarmthK) * (geometry.size.height - 6) + 3)
                     if index == 0 { path.move(to: point) } else { path.addLine(to: point) }
                 }
             }
-            .stroke(LinearGradient(gradient: gradient, startPoint: .leading, endPoint: .trailing),
-                    style: StrokeStyle(lineWidth: 3, lineCap: .round))
+            ZStack {
+                Path { path in
+                    for (index, sample) in samples.enumerated() {
+                        let point = CGPoint(x: sample.x * geometry.size.width,
+                                            y: (1 - sample.target.brightness) * (geometry.size.height - 6) + 3)
+                        if index == 0 { path.move(to: point) } else { path.addLine(to: point) }
+                    }
+                }
+                .stroke(.secondary, style: StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
+                // A thin outline keeps the neutral (white) peak visible
+                // in light appearance as well as dark appearance.
+                huePath.stroke(.primary.opacity(0.35), lineWidth: 5)
+                huePath.stroke(LinearGradient(gradient: gradient, startPoint: .leading, endPoint: .trailing),
+                               style: StrokeStyle(lineWidth: 3, lineCap: .round))
+            }
         }
     }
 

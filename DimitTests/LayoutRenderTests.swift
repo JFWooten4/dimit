@@ -84,6 +84,14 @@ final class LayoutRenderTests: XCTestCase {
                     state.scheduleConfig.location = Coordinate(latitude: 41.2995, longitude: 69.2401)
                     state.scheduleConfig.selectedCityID = "tashkent"
                 }
+                if mode == .bellCurve {
+                    // Hue must remain visible when brightness is constant.
+                    state.scheduleConfig.fixedDayStart = TimeOfDay(hour: 0, minute: 0)
+                    state.scheduleConfig.peakTime = TimeOfDay(hour: 13, minute: 0)
+                    state.scheduleConfig.bedtime = TimeOfDay(hour: 17, minute: 0)
+                    state.scheduleConfig.lowBrightness = 1
+                    state.scheduleConfig.peakBrightness = 1
+                }
                 let view = ScheduleSettingsTab(appState: state)
                     .environment(\.locale, Locale(identifier: locale))
                     .frame(width: 520)

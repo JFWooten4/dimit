@@ -867,19 +867,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Height shows brightness; color shows warmth. Ease up from wake-up to your peak, then fade by bedtime. Night warmth follows your NIGHT preset."
+            "value": "Colored curve: hue, from your NIGHT tint to neutral at the peak and back. Dashed curve: brightness."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Высота — яркость, цвет — теплота. Плавный подъём от пробуждения к пику и спад ко сну. Ночная теплота — из пресета NIGHT."
+            "value": "Цветная кривая — оттенок: от NIGHT к нейтральному на пике и обратно. Пунктир — яркость."
           }
         },
         "uz": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Balandlik — yorqinlik, rang — iliqlik. Uyg‘onishdan eng yuqori darajagacha asta ko‘tarilib, uyqugacha pasayadi. Tungi iliqlik NIGHT sozlamasidan olinadi."
+            "value": "Rangli egri chiziq — tus: NIGHT rangidan eng yuqori nuqtada neytralga va orqaga. Punktir — yorqinlik."
           }
         }
       }
