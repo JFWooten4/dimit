@@ -166,10 +166,6 @@ struct ScheduleSettingsTab: View {
                 bellPreview
                     .frame(height: 54)
                     .accessibilityHidden(true)
-                Text("schedule.bell_help")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             DatePicker(selection: timeOfDayAsDate($appState.scheduleConfig.fixedDayStart), displayedComponents: .hourAndMinute) {
                 Text("schedule.wake")
