@@ -280,7 +280,14 @@ final class AppStateTests: XCTestCase {
 
         state.warmthK = 2700
         state.adjustWarmth(by: Config.warmthHotkeyStepK)
-        XCTAssertEqual(state.warmthK, 2800)
+        XCTAssertEqual(state.warmthK, 2750)
+
+        // Low-end warmth adjustments must preserve the new 50 K precision.
+        state.warmthK = 800
+        state.adjustWarmth(by: -Config.warmthHotkeyStepK)
+        XCTAssertEqual(state.warmthK, 750)
+        state.adjustWarmth(by: Config.warmthHotkeyStepK)
+        XCTAssertEqual(state.warmthK, 800)
     }
 
     func test_adjustBrightness_stepsAndClampsToConfigRange() {

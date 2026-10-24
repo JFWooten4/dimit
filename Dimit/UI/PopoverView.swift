@@ -115,7 +115,7 @@ struct PopoverView: View {
             // Without an explicit label a bare Slider announces only its
             // value ("6500K") with no indication of *what* it controls —
             // the visible Text above it is a separate a11y element.
-            Slider(value: $appState.warmthK, in: Config.minWarmthK...Config.maxWarmthK, step: 100)
+            Slider(value: $appState.warmthK, in: Config.minWarmthK...Config.maxWarmthK, step: Config.warmthHotkeyStepK)
                 .accessibilityLabel(Text("main.warmth"))
                 .accessibilityValue(Text(formattedWarmth))
         }

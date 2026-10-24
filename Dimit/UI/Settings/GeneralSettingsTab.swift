@@ -142,7 +142,7 @@ private struct PresetEditorRow: View {
                 Slider(
                     value: warmthBinding,
                     in: Config.minWarmthK...Config.maxWarmthK,
-                    step: 100
+                    step: Config.warmthHotkeyStepK
                 )
                 // CLAUDE.md §8: "VoiceOver labels for both sliders and all
                 // buttons." The sibling Text is a separate element, so

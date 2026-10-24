@@ -21,7 +21,7 @@ enum Config {
     // MARK: - Hotkey step sizes (CLAUDE.md §3.9, C4)
     // Named here (not inlined in HotkeyManager) so a future stepper button
     // in the UI can't drift from what the hotkey does for the same action.
-    static let warmthHotkeyStepK: Double = 100 // matches the popover slider's own step
+    static let warmthHotkeyStepK: Double = 50 // shared by both sliders and the hotkeys
     static let brightnessHotkeyStep: Double = 0.05
 
     // CLAUDE.md §3.4 names `Config.ddcEnabled` as the DDC feature flag. It
