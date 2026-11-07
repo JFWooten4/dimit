@@ -56,11 +56,17 @@ struct ScheduleSettingsTab: View {
                 timeSection(title: "schedule.bedtime", binding: $appState.scheduleConfig.bedtime)
                 rampSection
             case .fixedTimes:
-                timeSection(title: "schedule.fixed_day_start", binding: $appState.scheduleConfig.fixedDayStart)
-                timeSection(title: "schedule.fixed_evening_start", binding: $appState.scheduleConfig.fixedEveningStart)
-                timeSection(title: "schedule.bedtime", binding: $appState.scheduleConfig.bedtime)
+                timingSection
+                if appState.scheduleConfig.timeBasis == .clock {
+                    timeSection(title: "schedule.fixed_day_start", binding: $appState.scheduleConfig.fixedDayStart)
+                    timeSection(title: "schedule.fixed_evening_start", binding: $appState.scheduleConfig.fixedEveningStart)
+                    timeSection(title: "schedule.bedtime", binding: $appState.scheduleConfig.bedtime)
+                } else {
+                    loginFixedSection
+                }
                 rampSection
             case .bellCurve:
+                timingSection
                 bellSection
             }
         }
@@ -160,6 +166,58 @@ struct ScheduleSettingsTab: View {
 
     // MARK: - Shared rows
 
+    /// An explicit choice: keep the original wall-clock scheduling as the
+    /// default, or advance a one-shot timeline from this login session.
+    private var timingSection: some View {
+        Section {
+            Picker(selection: $appState.scheduleConfig.timeBasis) {
+                Text("schedule.timing_clock").tag(ScheduleTimeBasis.clock)
+                Text("schedule.timing_login").tag(ScheduleTimeBasis.login)
+            } label: {
+                Text("schedule.timing")
+            }
+            .pickerStyle(.menu)
+            if appState.scheduleConfig.timeBasis == .login {
+                Text("schedule.login_help")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var loginFixedSection: some View {
+        Section {
+            Text("schedule.login_start")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            loginOffsetRow(title: "schedule.login_evening", binding: $appState.scheduleConfig.loginEveningMinutes)
+            loginOffsetRow(title: "schedule.login_bed", binding: $appState.scheduleConfig.loginBedMinutes)
+            if ScheduleEngine.phases(
+                forSessionStartingAt: Date(), mode: .fixedTimes,
+                config: appState.scheduleConfig
+            ).isEmpty {
+                Text("schedule.login_invalid")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
+    }
+
+    private func loginOffsetRow(title: LocalizedStringResource, binding: Binding<Int>) -> some View {
+        Stepper(value: binding, in: 0...2880, step: 15) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text(appState.localized(
+                    "schedule.login_offset_format", binding.wrappedValue / 60, binding.wrappedValue % 60
+                ))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+        }
+    }
+
     private var bellSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 6) {
@@ -167,14 +225,22 @@ struct ScheduleSettingsTab: View {
                     .frame(height: 54)
                     .accessibilityHidden(true)
             }
-            DatePicker(selection: timeOfDayAsDate($appState.scheduleConfig.fixedDayStart), displayedComponents: .hourAndMinute) {
-                Text("schedule.wake")
-            }
-            DatePicker(selection: timeOfDayAsDate($appState.scheduleConfig.peakTime), displayedComponents: .hourAndMinute) {
-                Text("schedule.peak")
-            }
-            DatePicker(selection: timeOfDayAsDate($appState.scheduleConfig.bedtime), displayedComponents: .hourAndMinute) {
-                Text("schedule.bedtime")
+            if appState.scheduleConfig.timeBasis == .clock {
+                DatePicker(selection: timeOfDayAsDate($appState.scheduleConfig.fixedDayStart), displayedComponents: .hourAndMinute) {
+                    Text("schedule.wake")
+                }
+                DatePicker(selection: timeOfDayAsDate($appState.scheduleConfig.peakTime), displayedComponents: .hourAndMinute) {
+                    Text("schedule.peak")
+                }
+                DatePicker(selection: timeOfDayAsDate($appState.scheduleConfig.bedtime), displayedComponents: .hourAndMinute) {
+                    Text("schedule.bedtime")
+                }
+            } else {
+                Text("schedule.login_start")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                loginOffsetRow(title: "schedule.login_peak", binding: $appState.scheduleConfig.loginPeakMinutes)
+                loginOffsetRow(title: "schedule.login_bed", binding: $appState.scheduleConfig.loginBedMinutes)
             }
             brightnessRow(title: "schedule.low_brightness", binding: Binding(
                 get: { appState.scheduleConfig.lowBrightness },
@@ -190,8 +256,14 @@ struct ScheduleSettingsTab: View {
                     appState.scheduleConfig.lowBrightness = min($0, appState.scheduleConfig.lowBrightness)
                 }
             ))
-            if ScheduleEngine.bellTimes(on: Date(), config: appState.scheduleConfig, calendar: .current) == nil {
-                Text("schedule.bell_invalid")
+            if (appState.scheduleConfig.timeBasis == .clock &&
+                ScheduleEngine.bellTimes(on: Date(), config: appState.scheduleConfig, calendar: .current) == nil) ||
+                (appState.scheduleConfig.timeBasis == .login &&
+                ScheduleEngine.phases(forSessionStartingAt: Date(), mode: .bellCurve, config: appState.scheduleConfig).isEmpty) {
+                Text(appState.localized(
+                    appState.scheduleConfig.timeBasis == .login
+                        ? "schedule.login_invalid" : "schedule.bell_invalid"
+                ))
                     .font(.caption)
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
@@ -216,12 +288,21 @@ struct ScheduleSettingsTab: View {
         let config = appState.scheduleConfig
         let calendar = Calendar.current
         let times = ScheduleEngine.bellTimes(on: Date(), config: config, calendar: calendar)
+        let loginStart = Date()
+        let origin: Date? = config.timeBasis == .login ? loginStart : times?.wake
+        let end: Date? = config.timeBasis == .login
+            ? loginStart.addingTimeInterval(TimeInterval(max(1440, config.loginBedMinutes + 60)) * 60)
+            : times.flatMap { calendar.date(byAdding: .day, value: 1, to: $0.wake) }
+        let sessionPhases = ScheduleEngine.phases(
+            forSessionStartingAt: loginStart, mode: .bellCurve, config: config
+        )
         let samples: [(x: Double, target: ScheduleEngine.Resolution)] = (0...144).compactMap { index in
-            guard let times,
-                  let end = calendar.date(byAdding: .day, value: 1, to: times.wake) else { return nil }
+            guard let origin, let end else { return nil }
             let x = Double(index) / 144
-            let date = times.wake.addingTimeInterval(end.timeIntervalSince(times.wake) * x)
-            let phases = ScheduleEngine.phases(coveringDayOf: date, mode: .bellCurve, config: config, calendar: calendar)
+            let date = origin.addingTimeInterval(end.timeIntervalSince(origin) * x)
+            let phases = config.timeBasis == .login
+                ? sessionPhases
+                : ScheduleEngine.phases(coveringDayOf: date, mode: .bellCurve, config: config, calendar: calendar)
             guard let target = ScheduleEngine.target(at: date, phases: phases, values: appState.values(for:)) else { return nil }
             return (x, target)
         }

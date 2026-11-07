@@ -418,4 +418,73 @@ final class ScheduleEngineTests: XCTestCase {
         }
     }
 
+
+    // MARK: - Login-anchored timelines
+
+    func test_loginBellCurveBeginsAtLowRisesToPeakAndHoldsLowAfterBedtime() {
+        var config = ScheduleConfig.defaults
+        config.mode = .bellCurve
+        config.timeBasis = .login
+        config.loginPeakMinutes = 180
+        config.loginBedMinutes = 540
+        config.lowBrightness = 0.2
+        config.peakBrightness = 0.8
+        let start = date(2026, 9, 8, 23, 15)
+        let phases = ScheduleEngine.phases(forSessionStartingAt: start, mode: .bellCurve, config: config)
+        XCTAssertEqual(phases.count, 4)
+        XCTAssertEqual(phases[1].start, start)
+        let atStart = try! XCTUnwrap(ScheduleEngine.target(at: start, phases: phases, values: values))
+        XCTAssertEqual(atStart.brightness, 0.2, accuracy: 0.000001)
+        let halfway = try! XCTUnwrap(ScheduleEngine.target(at: start.addingTimeInterval(90 * 60), phases: phases, values: values))
+        XCTAssertEqual(halfway.brightness, 0.5, accuracy: 0.000001)
+        let atPeak = try! XCTUnwrap(ScheduleEngine.target(at: start.addingTimeInterval(180 * 60), phases: phases, values: values))
+        XCTAssertEqual(atPeak.brightness, 0.8, accuracy: 0.000001)
+        let afterBed = try! XCTUnwrap(ScheduleEngine.target(at: start.addingTimeInterval(30 * 3600), phases: phases, values: values))
+        XCTAssertEqual(afterBed.brightness, 0.2, accuracy: 0.000001)
+        XCTAssertTrue(afterBed.isOn)
+    }
+
+    func test_loginFixedScheduleUsesElapsedTimeNotCalendarBoundaries() {
+        var config = ScheduleConfig.defaults
+        config.mode = .fixedTimes
+        config.timeBasis = .login
+        config.loginEveningMinutes = 60
+        config.loginBedMinutes = 180
+        config.rampMinutes = 0
+        let start = date(2026, 9, 8, 23)
+        let phases = ScheduleEngine.phases(forSessionStartingAt: start, mode: .fixedTimes, config: config)
+        XCTAssertEqual(phases.count, 3)
+        XCTAssertEqual(phases[1].start, start.addingTimeInterval(3600))
+        XCTAssertEqual(phases[2].start, start.addingTimeInterval(3 * 3600))
+        let afterMidnight = try! XCTUnwrap(ScheduleEngine.target(
+            at: start.addingTimeInterval(2 * 3600), phases: phases, values: values
+        ))
+        XCTAssertEqual(afterMidnight.settledPreset, .evening)
+        let nextDay = try! XCTUnwrap(ScheduleEngine.target(
+            at: start.addingTimeInterval(30 * 3600), phases: phases, values: values
+        ))
+        XCTAssertEqual(nextDay.settledPreset, .night)
+    }
+
+    func test_invalidRelativeScheduleHasNoPhasesAndLegacyConfigDecodesToClock() throws {
+        var config = ScheduleConfig.defaults
+        config.loginPeakMinutes = 120
+        config.loginBedMinutes = 60
+        XCTAssertTrue(ScheduleEngine.phases(
+            forSessionStartingAt: Date(), mode: .bellCurve, config: config
+        ).isEmpty)
+
+        let data = try JSONEncoder().encode(ScheduleConfig.defaults)
+        var old = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        for key in ["timeBasis", "loginPeakMinutes", "loginEveningMinutes", "loginBedMinutes"] {
+            old.removeValue(forKey: key)
+        }
+        let restored = try JSONDecoder().decode(
+            ScheduleConfig.self, from: JSONSerialization.data(withJSONObject: old)
+        )
+        XCTAssertEqual(restored.timeBasis, .clock)
+        XCTAssertEqual(restored.loginPeakMinutes, 360)
+        XCTAssertEqual(restored.loginEveningMinutes, 660)
+        XCTAssertEqual(restored.loginBedMinutes, 930)
+    }
 }

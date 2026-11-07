@@ -8,6 +8,13 @@ enum ScheduleMode: String, Codable, CaseIterable {
     case bellCurve
 }
 
+/// The same schedule can follow local clock times or run once from the
+/// beginning of the current macOS login session.
+enum ScheduleTimeBasis: String, Codable, CaseIterable {
+    case clock
+    case login
+}
+
 /// A wall-clock time, timezone-agnostic — interpreted against whatever
 /// `Calendar` the caller supplies (always the user's own local calendar in
 /// practice, since "bedtime" only makes sense as *their* clock time).
@@ -53,6 +60,12 @@ struct ScheduleConfig: Codable, Equatable {
     var peakTime: TimeOfDay = TimeOfDay(hour: 13, minute: 0)
     var lowBrightness: Double = 0.4
     var peakBrightness: Double = 1.0
+    var timeBasis: ScheduleTimeBasis = .clock
+    /// Relative offsets, measured from the session start rather than midnight.
+    /// Separate from wall-clock fields so switching bases preserves both sets.
+    var loginPeakMinutes: Int = 360
+    var loginEveningMinutes: Int = 660
+    var loginBedMinutes: Int = 930
 
     static let defaults = ScheduleConfig(
         mode: .manual,
@@ -101,6 +114,10 @@ struct ScheduleConfig: Codable, Equatable {
         peakTime = try container.decodeIfPresent(TimeOfDay.self, forKey: .peakTime) ?? fallback.peakTime
         lowBrightness = try container.decodeIfPresent(Double.self, forKey: .lowBrightness) ?? fallback.lowBrightness
         peakBrightness = try container.decodeIfPresent(Double.self, forKey: .peakBrightness) ?? fallback.peakBrightness
+        timeBasis = try container.decodeIfPresent(ScheduleTimeBasis.self, forKey: .timeBasis) ?? fallback.timeBasis
+        loginPeakMinutes = try container.decodeIfPresent(Int.self, forKey: .loginPeakMinutes) ?? fallback.loginPeakMinutes
+        loginEveningMinutes = try container.decodeIfPresent(Int.self, forKey: .loginEveningMinutes) ?? fallback.loginEveningMinutes
+        loginBedMinutes = try container.decodeIfPresent(Int.self, forKey: .loginBedMinutes) ?? fallback.loginBedMinutes
     }
 }
 
@@ -169,6 +186,50 @@ enum ScheduleEngine {
                 SchedulePhase(preset: .evening, start: clockTime(config.fixedEveningStart, on: day, calendar: calendar), rampMinutes: config.rampMinutes),
                 SchedulePhase(preset: .night, start: clockTime(config.bedtime, on: day, calendar: calendar), rampMinutes: config.rampMinutes),
             ])
+        }
+    }
+
+    /// Unlike calendar schedules, these phases happen *once* per login (or
+    /// after a sleep longer than two hours). Staying awake past the last
+    /// phase holds its final values rather than repeating at midnight.
+    static func phases(forSessionStartingAt start: Date, mode: ScheduleMode, config: ScheduleConfig) -> [SchedulePhase] {
+        func offset(_ minutes: Int) -> Date {
+            start.addingTimeInterval(TimeInterval(minutes) * 60)
+        }
+
+        switch mode {
+        case .bellCurve:
+            let peakMinutes = config.loginPeakMinutes
+            let bedMinutes = config.loginBedMinutes
+            guard peakMinutes > 0, bedMinutes > peakMinutes, bedMinutes <= 2880 else { return [] }
+            let low = config.lowBrightness.clamped(to: Config.minBrightness...Config.maxBrightness)
+            let peak = config.peakBrightness.clamped(to: low...Config.maxBrightness)
+            // Seed the beginning of the first ramp with the NIGHT/low
+            // values. Without this, the first frame would jump from neutral
+            // white/100% brightness instead of starting at the chosen low.
+            return [
+                SchedulePhase(preset: .night, start: start.addingTimeInterval(-1),
+                              rampMinutes: 0, brightnessOverride: low),
+                SchedulePhase(preset: .day, start: start,
+                              rampMinutes: peakMinutes, brightnessOverride: peak, smoothRamp: true),
+                SchedulePhase(preset: .night, start: offset(peakMinutes),
+                              rampMinutes: bedMinutes - peakMinutes,
+                              brightnessOverride: low, smoothRamp: true),
+                SchedulePhase(preset: .night, start: offset(bedMinutes),
+                              rampMinutes: 0, brightnessOverride: low, smoothRamp: true),
+            ]
+
+        case .fixedTimes:
+            let evening = config.loginEveningMinutes
+            let bed = config.loginBedMinutes
+            guard evening > 0, bed > evening, bed <= 2880 else { return [] }
+            return [
+                SchedulePhase(preset: .day, start: start, rampMinutes: 0),
+                SchedulePhase(preset: .evening, start: offset(evening), rampMinutes: config.rampMinutes),
+                SchedulePhase(preset: .night, start: offset(bed), rampMinutes: config.rampMinutes),
+            ]
+        case .manual, .sunsetToSunrise:
+            return []
         }
     }
 
