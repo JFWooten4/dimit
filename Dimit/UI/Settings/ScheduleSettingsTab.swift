@@ -260,7 +260,10 @@ struct ScheduleSettingsTab: View {
                 ScheduleEngine.bellTimes(on: Date(), config: appState.scheduleConfig, calendar: .current) == nil) ||
                 (appState.scheduleConfig.timeBasis == .login &&
                 ScheduleEngine.phases(forSessionStartingAt: Date(), mode: .bellCurve, config: appState.scheduleConfig).isEmpty) {
-                Text(appState.scheduleConfig.timeBasis == .login ? "schedule.login_invalid" : "schedule.bell_invalid")
+                Text(appState.localized(
+                    appState.scheduleConfig.timeBasis == .login
+                        ? "schedule.login_invalid" : "schedule.bell_invalid"
+                ))
                     .font(.caption)
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)

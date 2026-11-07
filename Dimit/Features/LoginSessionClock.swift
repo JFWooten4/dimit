@@ -46,6 +46,11 @@ final class LoginSessionClock {
                 snapshot = Snapshot(sessionID: identifier, startedAt: current, asleepSince: nil)
             } else {
                 snapshot = stored
+                // The app was relaunched after a short sleep: the wake
+                // notification occurred while we weren't running, so
+                // clear the stale marker instead of treating the next
+                // sleep as part of the earlier one.
+                snapshot.asleepSince = nil
             }
         } else {
             snapshot = Snapshot(sessionID: identifier, startedAt: current, asleepSince: nil)

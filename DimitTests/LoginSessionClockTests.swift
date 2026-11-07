@@ -55,6 +55,24 @@ final class LoginSessionClockTests: XCTestCase {
         XCTAssertEqual(reopened.start, time.current)
     }
 
+    func test_relaunchAfterShortSleepClearsPendingSleepMarker() {
+        let time = TestClock(Date(timeIntervalSince1970: 1_700_000_000))
+        let store = defaults()
+        let original = LoginSessionClock(defaults: store, now: time.now, sessionID: { "login-1" })
+        let start = original.start
+        original.willSleep()
+        time.current = time.current.addingTimeInterval(30 * 60)
+        let reopened = LoginSessionClock(defaults: store, now: time.now, sessionID: { "login-1" })
+        XCTAssertEqual(reopened.start, start)
+
+        // A subsequent real sleep starts its own interval, not one that
+        // accidentally includes the prior 30 minutes.
+        reopened.willSleep()
+        time.current = time.current.addingTimeInterval(105 * 60)
+        XCTAssertFalse(reopened.didWake())
+        XCTAssertEqual(reopened.start, start)
+    }
+
     func test_newSecurityLoginSessionStartsFreshEvenWithoutReboot() {
         let time = TestClock(Date(timeIntervalSince1970: 1_700_000_000))
         let store = defaults()
