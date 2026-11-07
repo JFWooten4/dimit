@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import Foundation
 
@@ -19,10 +20,12 @@ final class ScheduleCoordinator {
     private let appState: AppState
     private let calendar: () -> Calendar
     private let now: () -> Date
+    private let sessionClock: LoginSessionClock
 
     private var tickTimer: Timer?
     private var cachedPhases: [SchedulePhase] = []
     private var cachedPhasesDay: Date?
+    private var cachedSessionStart: Date?
 
     /// Set to the active phase's `start` the moment a manual change is
     /// detected; cleared once `now` has moved into a *later* phase than
@@ -48,10 +51,24 @@ final class ScheduleCoordinator {
 
     private var cancellables = Set<AnyCancellable>()
 
-    init(appState: AppState, calendar: @escaping () -> Calendar = { .current }, now: @escaping () -> Date = { Date() }) {
+    init(
+        appState: AppState,
+        calendar: @escaping () -> Calendar = { .current },
+        now: @escaping () -> Date = { Date() },
+        sessionClock: LoginSessionClock = .shared
+    ) {
         self.appState = appState
         self.calendar = calendar
         self.now = now
+        self.sessionClock = sessionClock
+
+        // NSWorkspace's center (not NotificationCenter.default) reports
+        // real system sleep/wake. Screen savers and lock/unlock are ignored.
+        let workspace = NSWorkspace.shared.notificationCenter
+        workspace.addObserver(self, selector: #selector(systemWillSleep(_:)),
+                              name: NSWorkspace.willSleepNotification, object: nil)
+        workspace.addObserver(self, selector: #selector(systemDidWake(_:)),
+                              name: NSWorkspace.didWakeNotification, object: nil)
 
         // isOn/warmthK/brightness are exactly the fields this coordinator
         // itself writes (see evaluateNow()) — anything else changing on
@@ -97,6 +114,28 @@ final class ScheduleCoordinator {
         tickTimer?.invalidate()
         tickTimer = nil
         cancellables.removeAll()
+        let workspace = NSWorkspace.shared.notificationCenter
+        workspace.removeObserver(self, name: NSWorkspace.willSleepNotification, object: nil)
+        workspace.removeObserver(self, name: NSWorkspace.didWakeNotification, object: nil)
+    }
+
+    @objc private func systemWillSleep(_ notification: Notification) {
+        sessionClock.willSleep()
+    }
+
+    @objc private func systemDidWake(_ notification: Notification) {
+        handleWake()
+    }
+
+    /// Shared with tests so wake behavior can be verified without putting
+    /// the machine to sleep or synthesizing AppKit notifications.
+    func handleWake() {
+        if sessionClock.didWake() {
+            cachedSessionStart = nil
+            pausedAtPhaseStart = nil
+        }
+        evaluateNow()
+        scheduleNextTick()
     }
 
     /// Computes the schedule's target for right now and writes it — unless
@@ -143,22 +182,45 @@ final class ScheduleCoordinator {
 
     private func handleConfigChanged() {
         cachedPhasesDay = nil // force a recompute even if the calendar day hasn't rolled over
+        cachedSessionStart = nil
         pausedAtPhaseStart = nil // a new mode/location/bedtime invalidates any prior override
         evaluateNow()
         scheduleNextTick() // ramp status (and manual<->automatic) may have just changed
     }
 
+    private var isLoginAnchored: Bool {
+        let mode = appState.scheduleConfig.mode
+        return appState.scheduleConfig.timeBasis == .login && (mode == .bellCurve || mode == .fixedTimes)
+    }
+
     private func ensurePhasesAreCurrent() {
-        let today = calendar().startOfDay(for: now())
-        guard cachedPhasesDay != today else { return }
-        cachedPhasesDay = today
+        if isLoginAnchored {
+            let start = sessionClock.start
+            guard cachedSessionStart != start else { return }
+            cachedSessionStart = start
+            cachedPhasesDay = nil
+        } else {
+            let today = calendar().startOfDay(for: now())
+            guard cachedPhasesDay != today || cachedSessionStart != nil else { return }
+            cachedPhasesDay = today
+            cachedSessionStart = nil
+        }
         recomputePhases()
     }
 
     private func recomputePhases() {
-        cachedPhases = ScheduleEngine.phases(
-            coveringDayOf: now(), mode: appState.scheduleConfig.mode, config: appState.scheduleConfig, calendar: calendar()
-        )
+        if isLoginAnchored {
+            cachedPhases = ScheduleEngine.phases(
+                forSessionStartingAt: sessionClock.start,
+                mode: appState.scheduleConfig.mode,
+                config: appState.scheduleConfig
+            )
+        } else {
+            cachedPhases = ScheduleEngine.phases(
+                coveringDayOf: now(), mode: appState.scheduleConfig.mode,
+                config: appState.scheduleConfig, calendar: calendar()
+            )
+        }
     }
 
     private func isCurrentlyRamping() -> Bool {
