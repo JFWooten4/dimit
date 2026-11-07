@@ -319,4 +319,41 @@ final class ScheduleCoordinatorTests: XCTestCase {
         XCTAssertNil(coordinator.pausedAtPhaseStart)
     }
 
+
+    func test_loginCurveContinuesAcrossShortSleepAndRestartsAfterLongSleep() {
+        let state = freshState()
+        var config = ScheduleConfig.defaults
+        config.mode = .bellCurve
+        config.timeBasis = .login
+        config.loginPeakMinutes = 360
+        config.loginBedMinutes = 900
+        config.lowBrightness = 0.2
+        config.peakBrightness = 0.8
+        state.scheduleConfig = config
+        let time = TestClock(date(2026, 9, 8, 9))
+        let session = LoginSessionClock(
+            defaults: UserDefaults(suiteName: "test.session.\(UUID().uuidString)")!,
+            now: time.now, sessionID: { "test-login" }
+        )
+        let coordinator = ScheduleCoordinator(
+            appState: state, calendar: { self.calendar }, now: time.now, sessionClock: session
+        )
+        defer { coordinator.stop() }
+        XCTAssertEqual(state.brightness, 0.2, accuracy: 0.000001)
+
+        time.current = time.current.addingTimeInterval(3 * 3600)
+        coordinator.evaluateNow()
+        XCTAssertEqual(state.brightness, 0.5, accuracy: 0.000001)
+        session.willSleep()
+        time.current = time.current.addingTimeInterval(3600)
+        coordinator.handleWake()
+        XCTAssertEqual(session.start, date(2026, 9, 8, 9))
+        XCTAssertGreaterThan(state.brightness, 0.5)
+
+        session.willSleep()
+        time.current = time.current.addingTimeInterval(2 * 3600 + 1)
+        coordinator.handleWake()
+        XCTAssertEqual(session.start, time.current)
+        XCTAssertEqual(state.brightness, 0.2, accuracy: 0.000001)
+    }
 }

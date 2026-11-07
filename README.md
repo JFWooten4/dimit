@@ -21,6 +21,12 @@ licence keys, activation, or telemetry.
   city list or an optional device location, plus presets and global shortcuts.
 - **Bell-curve schedule** with wake-up, peak and bedtime controls: ease from a
   chosen low brightness to a daytime peak, then gradually dim again for the night.
+- **Login-based timing** for bell-curve and fixed schedules: start a single cycle
+  when Dimit launches in your macOS login session, including through screen
+  savers and sleeps of two hours or less. Sleeping longer than two hours starts
+  a new cycle upon wake; logging out or restarting also starts a new session.
+  Enable **Launch at Login** to start the timer at login rather than first
+  opening Dimit manually. The final phase holds until the next cycle.
 - **Restore Colours** is available from the menu. OFF, quit, signal handlers,
   and launch restore the gamma tables; restoration on relaunch also handles a
   force-killed process.

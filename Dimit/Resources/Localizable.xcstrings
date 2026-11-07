@@ -1852,6 +1852,160 @@
         }
       }
     },
+    "schedule.login_bed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Night after login"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ночь после входа"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Kirishdan keyingi tungi rejim"
+          }
+        }
+      }
+    },
+    "schedule.login_evening": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Evening after login"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Вечер после входа"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Kirishdan keyingi kechki rejim"
+          }
+        }
+      }
+    },
+    "schedule.login_help": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starts when Dimit opens in your login session. Enable Launch at Login to start at sign-in. Screen savers and sleeps up to two hours keep the timer; a longer sleep starts over on wake."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Отсчёт начинается при запуске Dimit в сеансе. Включите автозапуск при входе. Заставка и сон до двух часов сохраняют таймер; более долгий сон запускает его заново."
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Dimit tizimga kirish seansida ishga tushganda vaqt hisobi boshlanadi. Kirishda ishga tushirishni yoqing. Ekran saqlagichi va ikki soatgacha uyqu taymerni saqlaydi; uzoqroq uyqudan uyg‘onganda qayta boshlanadi."
+          }
+        }
+      }
+    },
+    "schedule.login_invalid": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set the stages in order, within 48 hours after login."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Задайте этапы по порядку, в пределах 48 часов после входа."
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Bosqichlarni tizimga kirgandan keyingi 48 soat ichida tartib bilan belgilang."
+          }
+        }
+      }
+    },
+    "schedule.login_offset_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$d h %2$d min"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$d ч %2$d мин"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$d soat %2$d daqiqa"
+          }
+        }
+      }
+    },
+    "schedule.login_peak": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peak after login"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Пик после входа"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Kirishdan keyingi cho‘qqi"
+          }
+        }
+      }
+    },
+    "schedule.login_start": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start: at login"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Начало: при входе"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Boshlanish: tizimga kirganda"
+          }
+        }
+      }
+    },
     "schedule.low_brightness": {
       "localizations": {
         "en": {
@@ -2024,6 +2178,72 @@
           "stringUnit": {
             "state": "translated",
             "value": "Quyosh botishidan chiqishigacha"
+          }
+        }
+      }
+    },
+    "schedule.timing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Timing"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Отсчёт времени"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Vaqt hisobi"
+          }
+        }
+      }
+    },
+    "schedule.timing_clock": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clock times"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "По времени суток"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Soat vaqti bo‘yicha"
+          }
+        }
+      }
+    },
+    "schedule.timing_login": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Since login"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "С момента входа"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Tizimga kirgandan beri"
           }
         }
       }

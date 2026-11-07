@@ -16,7 +16,7 @@ import Foundation
 /// is the tested entry point, called both by the timer and directly by
 /// `ScheduleCoordinatorTests`.
 @MainActor
-final class ScheduleCoordinator {
+final class ScheduleCoordinator: NSObject {
     private let appState: AppState
     private let calendar: () -> Calendar
     private let now: () -> Date
@@ -61,6 +61,7 @@ final class ScheduleCoordinator {
         self.calendar = calendar
         self.now = now
         self.sessionClock = sessionClock
+        super.init()
 
         // NSWorkspace's center (not NotificationCenter.default) reports
         // real system sleep/wake. Screen savers and lock/unlock are ignored.
